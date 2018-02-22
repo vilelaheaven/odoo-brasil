@@ -80,7 +80,7 @@ class InvoiceEletronic(models.Model):
                     '[^0-9]', '', self.company_id.cnae_main_id.id_cnae or ''),
                 'cst_servico': '1',
                 'aliquota': aliquota,
-                'valor_unitario': line.preco_unitario,
+                'valor_unitario': line.valor_liquido / line.quantidade,
                 'quantidade': int(line.quantidade),
                 'valor_total': line.valor_liquido,
             })
@@ -105,6 +105,27 @@ class InvoiceEletronic(models.Model):
             'cfps': cfps,
             'observacoes': '',
         }
+
+    def _find_attachment_ids_email(self):
+        atts = super(InvoiceEletronic, self)._find_attachment_ids_email()
+        if self.model not in ('012'):
+            return atts
+        attachment_obj = self.env['ir.attachment']
+        attachment_ids = attachment_obj.search(
+            [('res_model', '=', 'invoice.eletronic'),
+             ('res_id', '=', self.id),
+             ('name', 'like', 'nfse-ret')])
+        for attachment in attachment_ids:
+            xml_id = attachment_obj.create(dict(
+                name=attachment.name,
+                datas_fname=attachment.datas_fname,
+                datas=attachment.datas,
+                mimetype=attachment.mimetype,
+                res_model='account.invoice',
+                res_id=self.invoice_id.id,
+            ))
+            atts.append(xml_id.id)
+        return atts
 
     @api.multi
     def action_post_validate(self):
